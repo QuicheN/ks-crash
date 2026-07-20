@@ -1,16 +1,28 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// App.jsx
+import { useEffect, useState } from 'react';
+import { Provider } from 'react-redux';
+import { store } from './state/store';
+import { SceneCanvas } from './rendering/SceneCanvas';
+import { initWorld } from './physics/world';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [worldReady, setWorldReady] = useState(false);
+
+  useEffect(() => {
+    initWorld().then(() => setWorldReady(true));
+  }, []);
+
+  if (!worldReady) return <div>Loading physics engine…</div>;
 
   return (
-    <>
-    </>
-  )
+    <Provider store={store}>
+      <div className="app-layout">
+        <main className="viewport">
+          <SceneCanvas />
+        </main>
+      </div>
+    </Provider>
+  );
 }
 
-export default App
+export default App;
