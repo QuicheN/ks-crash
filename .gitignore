@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 
 #Claude Files
-claude.md
+*.md
