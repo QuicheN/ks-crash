@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { GroundPlane } from './GroundPlane';
+import { VehicleMesh } from './VehicleMesh';
 
 
 export function SceneCanvas({ children }) {
@@ -10,6 +11,7 @@ export function SceneCanvas({ children }) {
       <directionalLight position={[10, 15, 10]} intensity={1} castShadow />
       <Suspense fallback={null}>
         <GroundPlane />
+        <VehicleMesh />
         {children}
       </Suspense>
     </Canvas>
