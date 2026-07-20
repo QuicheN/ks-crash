@@ -25,3 +25,6 @@ dist-ssr
 
 #Claude Files
 *.md
+
+#Huge Files
+public
