@@ -78,6 +78,37 @@ export const CAMERA_MAX_DISTANCE = 9.5;
 // turns. Stays well clear of CAMERA_MIN_DISTANCE, so the aim can never reach the camera.
 export const CAMERA_MAX_LOOK_LAG = 2.0;
 
+// --- Collision filtering --------------------------------------------------
+// Rapier interaction groups: (membership << 16) | filter. Two colliders interact only if
+// each one's membership bit is present in the other's filter. Debris is separated from the
+// vehicle so a part that detaches from *inside* the chassis cuboid (the hood sits within
+// it) doesn't explode outward on its first step.
+export const GROUP_VEHICLE = 0x0001;
+export const GROUP_DEBRIS = 0x0002;
+export const GROUP_WORLD = 0x0004;
+const NOT_DEBRIS = 0xffff & ~GROUP_DEBRIS;
+export const CHASSIS_GROUPS = (GROUP_VEHICLE << 16) | NOT_DEBRIS;
+export const DEBRIS_GROUPS = (GROUP_DEBRIS << 16) | NOT_DEBRIS; // also ignores other debris
+export const OBSTACLE_GROUPS = (GROUP_WORLD << 16) | 0xffff;
+// Suspension raycasts only see world geometry — otherwise a bumper lying on the road would
+// lift the wheel that rolls over it.
+export const WHEEL_RAY_GROUPS = (GROUP_VEHICLE << 16) | GROUP_WORLD;
+
+// --- Collision severity / damage -----------------------------------------
+// Severity is the NORMAL component of the chassis velocity at the moment of impact (m/s),
+// not raw speed: a 300mph graze along a wall is barely an impact, a 20mph head-on is.
+// Below this, an impact is treated as a scrape and ignored entirely.
+export const IMPACT_MIN_SEVERITY = 2.0; // m/s
+// A part detaches when an impact lands within (its bounding radius + this) of the contact
+// point. Keeps a rear-end hit from popping the front bumper off.
+export const IMPACT_PART_RADIUS_MARGIN = 0.35; // meters
+// Density for detached debris. Applied to the convex hull volume, so a ~0.1m³ bumper hull
+// lands near 12kg.
+export const DETACHED_PART_DENSITY = 120.0;
+// A detached part inherits the chassis velocity plus this much kick along the contact
+// normal, so it visibly separates instead of riding along with the car.
+export const DETACH_SEPARATION_SPEED = 2.5; // m/s
+
 // Regexes that match each wheel's node name in [FL, FR, RL, RR] order, tolerant of the
 // separators GLTF name-sanitizing may leave ("Wheel.Ft.L" / "Wheel_Ft_L" / "WheelFtL").
 // Used by VehicleMesh to locate the 4 spinnable wheel groups in the cloned scene.

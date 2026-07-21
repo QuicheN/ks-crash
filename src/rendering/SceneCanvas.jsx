@@ -2,6 +2,7 @@ import { Suspense, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { GroundPlane } from './GroundPlane';
 import { VehicleMesh } from './VehicleMesh';
+import { ObstacleMesh } from './ObstacleMesh';
 import { CameraRig } from './CameraRig';
 
 
@@ -32,6 +33,8 @@ export function SceneCanvas({ children }) {
       <directionalLight position={[-10, 8, -10]} intensity={0.5} />
       <Suspense fallback={null}>
         <GroundPlane />
+        {/* Crash target. The car's forward is +Z, so this sits straight ahead of spawn. */}
+        <ObstacleMesh position={[0, 1.5, 60]} halfExtents={[8, 1.5, 0.5]} />
         <VehicleMesh bodyRef={vehicleBodyRef} />
         {/* Must stay AFTER <VehicleMesh/>: useFrame callbacks of equal priority run in
             subscription order, so this ordering is what lets the camera read the car

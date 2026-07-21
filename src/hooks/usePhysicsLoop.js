@@ -11,8 +11,10 @@
 // chase camera.
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { getWorld } from '../physics/world';
+import { getWorld, getEventQueue } from '../physics/world';
 import { applyControls, stepVehicle } from '../physics/vehicleController';
+import { captureApproachVelocity, drainCollisions } from '../physics/collisionHandler';
+import { snapshotDetachedParts } from '../damage/partDetachment';
 
 const FIXED_DT = 1 / 60; // seconds per physics substep
 const MAX_SUBSTEPS = 5; // cap to avoid a spiral-of-death after a tab stall
@@ -31,11 +33,12 @@ function snapshot(vehicle) {
   prev.quat.w = r.w;
 }
 
-export function usePhysicsLoop(vehicleRef, controlsRef) {
+export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef) {
   const accumulator = useRef(0);
 
   useFrame((_, delta) => {
     const world = getWorld();
+    const eventQueue = getEventQueue();
     const vehicle = vehicleRef.current;
     if (!world || !vehicle) return; // not spawned yet — nothing to step
 
@@ -51,9 +54,16 @@ export function usePhysicsLoop(vehicleRef, controlsRef) {
       // Re-snapshotting each substep leaves prev holding the state immediately before
       // the LAST step taken — which is the one the render blends out of.
       snapshot(vehicle);
+      snapshotDetachedParts(); // debris rides the same prev/alpha interpolation
       applyControls(vehicle, controlsRef, FIXED_DT); // input -> wheel forces
       stepVehicle(vehicle, FIXED_DT); // suspension/engine -> chassis velocity
-      world.step(); // integrate the whole world
+      // Must be read BEFORE the step: once the solver runs it has already cancelled the
+      // approach velocity that defines the impact's severity.
+      captureApproachVelocity(vehicle);
+      world.step(eventQueue); // integrate the whole world, collecting contact events
+      // Drained per substep, not per frame, so a multi-substep frame can't merge or drop
+      // two separate impacts.
+      drainCollisions(world, eventQueue, vehicle, onImpactRef?.current);
       accumulator.current -= FIXED_DT;
       steps++;
     }

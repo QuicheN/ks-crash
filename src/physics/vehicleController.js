@@ -17,6 +17,8 @@ import {
   MAX_STEER_ANGLE,
   STEER_LERP_SPEED,
   WHEEL_FRICTION_SLIP,
+  CHASSIS_GROUPS,
+  WHEEL_RAY_GROUPS,
 } from '../utils/constants';
 
 // Suspension points straight down; the axle runs along the local -x axis.
@@ -32,12 +34,13 @@ const REAR_WHEELS = [2, 3]; // driven (rear-wheel drive)
  * with four wheels. Returns the handle the rest of the system drives.
  */
 export function createVehicle(world, startPosition) {
-  // Dynamic rigid body for the chassis, placed at the spawn point.
-  const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(
-    startPosition.x,
-    startPosition.y,
-    startPosition.z,
-  );
+  // Dynamic rigid body for the chassis, placed at the spawn point. CCD is on because this
+  // sim targets extreme speeds: at 268 m/s the chassis moves ~4.5m per 60Hz step, further
+  // than its own length, so discrete collision detection would tunnel straight through a
+  // wall without ever generating a contact.
+  const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(startPosition.x, startPosition.y, startPosition.z)
+    .setCcdEnabled(true);
   const chassisBody = world.createRigidBody(bodyDesc);
 
   // A single cuboid collider stands in for the whole car body, lifted off the body
@@ -49,8 +52,12 @@ export function createVehicle(world, startPosition) {
     CHASSIS_HALF_EXTENTS.z,
   )
     .setTranslation(CHASSIS_COLLIDER_OFFSET.x, CHASSIS_COLLIDER_OFFSET.y, CHASSIS_COLLIDER_OFFSET.z)
-    .setDensity(CHASSIS_MASS_DENSITY);
-  world.createCollider(colliderDesc, chassisBody);
+    .setDensity(CHASSIS_MASS_DENSITY)
+    // Collision events are emitted when EITHER collider opts in, so enabling it here covers
+    // every chassis impact without having to flag each obstacle.
+    .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+  const chassisCollider = world.createCollider(colliderDesc, chassisBody);
+  chassisCollider.setCollisionGroups(CHASSIS_GROUPS);
 
   // The controller drives the chassis body via per-wheel raycasts each step.
   const controller = world.createVehicleController(chassisBody);
@@ -64,7 +71,7 @@ export function createVehicle(world, startPosition) {
     controller.setWheelFrictionSlip(i, WHEEL_FRICTION_SLIP);
   });
 
-  return { chassisBody, controller, currentSteer: 0 };
+  return { chassisBody, chassisCollider, controller, currentSteer: 0 };
 }
 
 /**
@@ -97,5 +104,7 @@ export function applyControls(vehicle, controls, dt) {
  * onto the chassis body's velocity. Must run before world.step() each substep.
  */
 export function stepVehicle(vehicle, dt) {
-  vehicle.controller.updateVehicle(dt);
+  // Restrict the suspension raycasts to world geometry so detached debris on the road
+  // can't act as a ramp under a wheel.
+  vehicle.controller.updateVehicle(dt, undefined, WHEEL_RAY_GROUPS);
 }

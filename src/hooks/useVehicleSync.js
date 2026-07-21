@@ -20,6 +20,7 @@
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WHEEL_RADIUS } from '../utils/constants';
+import { syncDetachedParts } from '../damage/partDetachment';
 
 // Scratch objects reused every frame to avoid per-frame allocation.
 const AXLE_AXIS = new THREE.Vector3(1, 0, 0); // wheel-local axle (spin)
@@ -57,6 +58,10 @@ export function useVehicleSync(vehicleRef, bodyRef, wheelsRef) {
       body.position.set(t.x, t.y, t.z);
       body.quaternion.set(r.x, r.y, r.z, r.w);
     }
+
+    // Debris is no longer parented to the car, so it needs its own transform write —
+    // interpolated by the same alpha so it stays smooth at 120Hz like the chassis.
+    syncDetachedParts(vehicle.alpha ?? 0);
 
     const wheels = wheelsRef.current;
     if (!wheels) return;
