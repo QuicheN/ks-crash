@@ -19,7 +19,6 @@
 // gives every wheel a correct, matching roll rate in a straight line and in turns.
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { WHEEL_RADIUS } from '../utils/constants';
 import { syncDetachedParts } from '../damage/partDetachment';
 
 // Scratch objects reused every frame to avoid per-frame allocation.
@@ -72,7 +71,9 @@ export function useVehicleSync(vehicleRef, bodyRef, wheelsRef) {
     const lv = vehicle.chassisBody.linvel();
     fwdWorld.copy(FORWARD).applyQuaternion(body.quaternion);
     const forwardSpeed = lv.x * fwdWorld.x + lv.y * fwdWorld.y + lv.z * fwdWorld.z;
-    vehicle.wheelRoll = (vehicle.wheelRoll ?? 0) + (forwardSpeed / WHEEL_RADIUS) * delta;
+    // Radius comes from the vehicle definition, so a model swap re-derives the roll rate.
+    const wheelRadius = vehicle.definition.wheels.radius;
+    vehicle.wheelRoll = (vehicle.wheelRoll ?? 0) + (forwardSpeed / wheelRadius) * delta;
     spinQ.setFromAxisAngle(AXLE_AXIS, vehicle.wheelRoll);
 
     for (let i = 0; i < wheels.length; i++) {

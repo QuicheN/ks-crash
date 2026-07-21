@@ -4,19 +4,10 @@
 // raycasts. Method names verified against @dimforge/rapier3d-compat 0.14.0.
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  CHASSIS_HALF_EXTENTS,
-  CHASSIS_COLLIDER_OFFSET,
-  CHASSIS_MASS_DENSITY,
-  WHEEL_OFFSETS,
-  WHEEL_RADIUS,
-  SUSPENSION_REST_LENGTH,
-  SUSPENSION_STIFFNESS,
-  MAX_SUSPENSION_TRAVEL,
   MAX_ENGINE_FORCE,
   MAX_BRAKE_FORCE,
   MAX_STEER_ANGLE,
   STEER_LERP_SPEED,
-  WHEEL_FRICTION_SLIP,
   CHASSIS_GROUPS,
   WHEEL_RAY_GROUPS,
 } from '../utils/constants';
@@ -30,10 +21,29 @@ const FRONT_WHEELS = [0, 1]; // steered
 const REAR_WHEELS = [2, 3]; // driven (rear-wheel drive)
 
 /**
- * Build the chassis rigid body + collider and attach a ray-cast vehicle controller
- * with four wheels. Returns the handle the rest of the system drives.
+ * Build the chassis rigid body + collider and attach a ray-cast vehicle controller with four
+ * wheels, sized from the vehicle DEFINITION (src/vehicles/) rather than global constants, so
+ * swapping models needs no change here. Returns the handle the rest of the system drives.
  */
-export function createVehicle(world, startPosition) {
+export function createVehicle(world, startPosition, definition) {
+  const { chassis, wheels } = definition;
+  const {
+    halfExtents: CHASSIS_HALF_EXTENTS,
+    colliderOffset: CHASSIS_COLLIDER_OFFSET,
+    density: CHASSIS_MASS_DENSITY,
+  } = chassis;
+  const {
+    radius: WHEEL_RADIUS,
+    offsets: WHEEL_OFFSETS,
+    frictionSlip: WHEEL_FRICTION_SLIP,
+    suspension,
+  } = wheels;
+  const {
+    restLength: SUSPENSION_REST_LENGTH,
+    stiffness: SUSPENSION_STIFFNESS,
+    maxTravel: MAX_SUSPENSION_TRAVEL,
+  } = suspension;
+
   // Dynamic rigid body for the chassis, placed at the spawn point. CCD is on because this
   // sim targets extreme speeds: at 268 m/s the chassis moves ~4.5m per 60Hz step, further
   // than its own length, so discrete collision detection would tunnel straight through a
@@ -71,7 +81,7 @@ export function createVehicle(world, startPosition) {
     controller.setWheelFrictionSlip(i, WHEEL_FRICTION_SLIP);
   });
 
-  return { chassisBody, chassisCollider, controller, currentSteer: 0 };
+  return { chassisBody, chassisCollider, controller, currentSteer: 0, definition };
 }
 
 /**

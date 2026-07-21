@@ -22,6 +22,7 @@ export const PartCategory = {
   LIGHT: 'light',
   TRIM: 'trim',
   STRUCTURE: 'structure', // unibody / frame — the load-bearing core
+  WHEEL: 'wheel', // load-bearing for the raycast controller; never destructible
 };
 
 // stiffness      - relative resistance to deformation, 0..1. Higher = holds its shape.
@@ -47,6 +48,9 @@ const MANIFEST = {
   [PartCategory.ROOF]: { stiffness: 0.75, detachSeverity: 30 },
   [PartCategory.ROCKER]: { stiffness: 0.9, detachSeverity: null },
   [PartCategory.STRUCTURE]: { stiffness: 1.0, detachSeverity: null },
+  // Wheels never detach and never crumple — the raycast vehicle controller drives from them,
+  // so deforming or removing one would break the car's ability to move at all.
+  [PartCategory.WHEEL]: { stiffness: 1.0, detachSeverity: null },
 };
 
 const FALLBACK = { stiffness: 0.5, detachSeverity: null };
