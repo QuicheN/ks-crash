@@ -21,6 +21,7 @@ import {
   CAMERA_LOOK_LAMBDA,
   CAMERA_MIN_DISTANCE,
   CAMERA_MAX_DISTANCE,
+  CAMERA_MAX_LOOK_LAG,
 } from '../utils/constants';
 
 // Scratch objects reused every frame to avoid per-frame allocation.
@@ -30,6 +31,7 @@ const fwd = new THREE.Vector3();
 const desiredPos = new THREE.Vector3();
 const desiredLook = new THREE.Vector3();
 const flatOffset = new THREE.Vector3();
+const lookLag = new THREE.Vector3();
 
 export function CameraRig({ targetRef }) {
   const camera = useThree((s) => s.camera);
@@ -67,6 +69,18 @@ export function CameraRig({ targetRef }) {
       // amount of catch-up happens per second regardless of framerate.
       camera.position.lerp(desiredPos, 1 - Math.exp(-CAMERA_POSITION_LAMBDA * delta));
       smoothedLook.current.lerp(desiredLook, 1 - Math.exp(-CAMERA_LOOK_LAMBDA * delta));
+    }
+
+    // Aim tether. Same unbounded-lag problem as the position, but it fails far more
+    // violently: the lag points back along the travel axis, straight at the camera, so at
+    // speed the aim pitches down hard and eventually inverts. Clamping the offset from the
+    // true aim point keeps framing at 600mph identical to framing at rest.
+    lookLag.subVectors(smoothedLook.current, desiredLook);
+    const lagDist = lookLag.length();
+    if (lagDist > CAMERA_MAX_LOOK_LAG) {
+      smoothedLook.current
+        .copy(desiredLook)
+        .addScaledVector(lookLag, CAMERA_MAX_LOOK_LAG / lagDist);
     }
 
     // Tether. The damping above lags by roughly speed/lambda, which is unbounded: at top

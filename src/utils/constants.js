@@ -68,6 +68,15 @@ export const CAMERA_LOOK_LAMBDA = 9.0;
 // Nominal resting distance is |CAMERA_FOLLOW_OFFSET.z| = 7.5.
 export const CAMERA_MIN_DISTANCE = 5.5;
 export const CAMERA_MAX_DISTANCE = 9.5;
+// Cap on how far the AIM point may trail the car. The look damping lags by ~speed/lambda,
+// which is unbounded, and the lag runs backwards along the travel axis — straight at the
+// camera. As it grows, the aim vector's horizontal component shrinks while its 1m vertical
+// drop does not, so the camera pitches down ever harder and lifts the car out of frame;
+// once the lag exceeds the follow distance the aim point is BEHIND the camera and the view
+// swings away entirely (measured: car gone by ~320mph). Small enough that framing at speed
+// matches framing at rest, large enough to keep some "looking where you came from" in
+// turns. Stays well clear of CAMERA_MIN_DISTANCE, so the aim can never reach the camera.
+export const CAMERA_MAX_LOOK_LAG = 2.0;
 
 // Regexes that match each wheel's node name in [FL, FR, RL, RR] order, tolerant of the
 // separators GLTF name-sanitizing may leave ("Wheel.Ft.L" / "Wheel_Ft_L" / "WheelFtL").
