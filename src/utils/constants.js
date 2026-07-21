@@ -100,13 +100,3 @@ export const CRUMPLE_SEVERITY_SCALE = 0.02;
 export const CRUMPLE_PULL = 0.5;
 // Max random bend of a fully-crushed chunk (radians) — keeps damage from looking uniform.
 export const CRUMPLE_ROTATION = 0.35;
-
-// Regexes that match each wheel's node name in [FL, FR, RL, RR] order, tolerant of the
-// separators GLTF name-sanitizing may leave ("Wheel.Ft.L" / "Wheel_Ft_L" / "WheelFtL").
-// Used by VehicleMesh to locate the 4 spinnable wheel groups in the cloned scene.
-export const WHEEL_NODE_PATTERNS = [
-  /wheel\W*ft\W*l/i, // FL
-  /wheel\W*ft\W*r/i, // FR
-  /wheel\W*bk\W*l/i, // RL
-  /wheel\W*bk\W*r/i, // RR
-];
