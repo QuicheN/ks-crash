@@ -45,6 +45,30 @@ export const WHEEL_OFFSETS = [
   { x: -0.815, y: 0.63, z: -1.341 }, // 3: RR (rear-right,  -x, rear  -z)
 ];
 
+// --- Chase camera --------------------------------------------------------
+// Offset from the car, expressed in the car's YAW-ONLY frame (no pitch/roll, so the
+// horizon stays level through suspension squat/dive and body lean). z is NEGATIVE
+// because the model's forward is local +Z, so -z sits behind the car. If the forward
+// direction is ever flipped (see the engine-force follow-up), flip this sign with it.
+export const CAMERA_FOLLOW_OFFSET = { x: 0, y: 2.6, z: -7.5 };
+// The camera aims at a point this far above the car's origin. Because the aim point sits
+// below the camera's own height, the car renders slightly BELOW screen center — this is
+// the primary knob for vertical framing (raise it to push the car further down).
+export const CAMERA_LOOK_HEIGHT = 1.6;
+// Exponential-damping rates (1/seconds). Higher = tighter/snappier, lower = more lag.
+// The aim is deliberately snappier than the position so the car stays framed while the
+// camera body swings wide through a turn.
+export const CAMERA_POSITION_LAMBDA = 5.0;
+export const CAMERA_LOOK_LAMBDA = 9.0;
+// Hard limits on how far the camera may sit from the car, measured HORIZONTALLY (XZ) —
+// height is left to the damping. The spring above lags by roughly speed/lambda, so at top
+// speed it would otherwise trail arbitrarily far back, and in fast reverse the car would
+// close that gap, overtake the camera and leave the frame entirely. These bound the
+// spring's travel without removing it: between the limits the chase still breathes.
+// Nominal resting distance is |CAMERA_FOLLOW_OFFSET.z| = 7.5.
+export const CAMERA_MIN_DISTANCE = 5.5;
+export const CAMERA_MAX_DISTANCE = 9.5;
+
 // Regexes that match each wheel's node name in [FL, FR, RL, RR] order, tolerant of the
 // separators GLTF name-sanitizing may leave ("Wheel.Ft.L" / "Wheel_Ft_L" / "WheelFtL").
 // Used by VehicleMesh to locate the 4 spinnable wheel groups in the cloned scene.

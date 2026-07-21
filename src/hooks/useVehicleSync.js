@@ -3,7 +3,11 @@
 // no React state, no dispatches (CLAUDE.md: physics never touches Redux at 60fps). Runs
 // in its own useFrame, separate from the physics-step loop.
 //
-//   - Chassis: rigid-body translation/rotation -> the car <group>.
+//   - Chassis: rigid-body translation/rotation -> the car <group>, INTERPOLATED between
+//     the last two physics steps by usePhysicsLoop's leftover-accumulator alpha. Physics
+//     runs at a fixed 60Hz but rendering doesn't, so copying the raw transform makes the
+//     car stair-step (dead still on frames where no substep ran, then a double jump) —
+//     which reads as jitter against the smoothly-damped chase camera.
 //   - Wheels : all four spin about their axle (wheel-local X); the front pair also steer
 //     about vertical (wheel-local Y). Both are layered on each wheel's captured rest
 //     orientation so any authored toe/camber is preserved.
@@ -24,6 +28,10 @@ const FORWARD = new THREE.Vector3(0, 0, 1); // car-local forward
 const fwdWorld = new THREE.Vector3();
 const spinQ = new THREE.Quaternion();
 const steerQ = new THREE.Quaternion();
+const prevPos = new THREE.Vector3();
+const currPos = new THREE.Vector3();
+const prevQuat = new THREE.Quaternion();
+const currQuat = new THREE.Quaternion();
 
 export function useVehicleSync(vehicleRef, bodyRef, wheelsRef) {
   useFrame((_, delta) => {
@@ -31,11 +39,24 @@ export function useVehicleSync(vehicleRef, bodyRef, wheelsRef) {
     const body = bodyRef.current;
     if (!vehicle || !body) return;
 
-    // Chassis: Rapier translation()/rotation() -> Three.js position/quaternion.
+    // Chassis: Rapier translation()/rotation() -> Three.js position/quaternion, blended
+    // `alpha` of the way from the state before the last physics step to the current one.
     const t = vehicle.chassisBody.translation();
     const r = vehicle.chassisBody.rotation();
-    body.position.set(t.x, t.y, t.z);
-    body.quaternion.set(r.x, r.y, r.z, r.w);
+    const prev = vehicle.prev;
+    if (prev) {
+      currPos.set(t.x, t.y, t.z);
+      currQuat.set(r.x, r.y, r.z, r.w);
+      prevPos.set(prev.pos.x, prev.pos.y, prev.pos.z);
+      prevQuat.set(prev.quat.x, prev.quat.y, prev.quat.z, prev.quat.w);
+      const alpha = vehicle.alpha ?? 0;
+      body.position.lerpVectors(prevPos, currPos, alpha);
+      body.quaternion.slerpQuaternions(prevQuat, currQuat, alpha);
+    } else {
+      // First frame(s): no step has run yet, so there's nothing to blend between.
+      body.position.set(t.x, t.y, t.z);
+      body.quaternion.set(r.x, r.y, r.z, r.w);
+    }
 
     const wheels = wheelsRef.current;
     if (!wheels) return;

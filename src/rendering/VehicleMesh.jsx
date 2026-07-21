@@ -28,7 +28,7 @@ function collectWheels(root) {
   });
 }
 
-export function VehicleMesh() {
+export function VehicleMesh({ bodyRef: externalBodyRef }) {
   const { scene } = useGLTF(MODEL_URL);
   // Clone so future multi-vehicle support doesn't share mesh/material instances.
   const cloned = useMemo(() => scene.clone(true), [scene]);
@@ -38,7 +38,10 @@ export function VehicleMesh() {
 
   const controlsRef = useKeyboardControls();
   const vehicleRef = useRef(null); // { chassisBody, controller, currentSteer }
-  const bodyRef = useRef(null); // the <group> the model lives in
+  // The <group> the model lives in. The parent may pass its own ref in so other components
+  // (CameraRig) can read the car's transform; fall back to a private one when standalone.
+  const localBodyRef = useRef(null);
+  const bodyRef = externalBodyRef ?? localBodyRef;
 
   // Create the physics vehicle exactly once. The cleanup tears it down so React
   // StrictMode's dev double-mount doesn't leave a duplicate chassis in the world.
