@@ -110,6 +110,31 @@ export function applyControls(vehicle, controls, dt) {
 }
 
 /**
+ * Put the car back at the spawn point, upright and at rest (the R key).
+ *
+ * Velocity and angular velocity have to be zeroed explicitly: teleporting a rigid body moves
+ * it but keeps its momentum, so a car respawned mid-crash would immediately tumble away from
+ * the spawn point at whatever speed it hit the wall. `wakeUp: true` on each write because a
+ * body that has gone to sleep would otherwise ignore them until something else disturbed it.
+ *
+ * Damage is NOT this function's business — `VehicleMesh` owns the model, so it clears debris
+ * and crumple alongside this call.
+ */
+export function resetVehicle(vehicle, startPosition) {
+  const { chassisBody, controller } = vehicle;
+  chassisBody.setTranslation(startPosition, true);
+  chassisBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+  chassisBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  chassisBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+  // Stored control state, or the car would respawn mid-corner with the wheels still turned.
+  vehicle.currentSteer = 0;
+  FRONT_WHEELS.forEach((i) => controller.setWheelSteering(i, 0));
+  REAR_WHEELS.forEach((i) => controller.setWheelEngineForce(i, 0));
+  vehicle.wheelRoll = 0; // the visual spin angle useVehicleSync integrates
+}
+
+/**
  * Advance the vehicle: recomputes suspension/engine/brake forces and writes them
  * onto the chassis body's velocity. Must run before world.step() each substep.
  */

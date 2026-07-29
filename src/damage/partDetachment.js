@@ -109,6 +109,16 @@ export function detachPart(world, scene, node, { velocity, normal } = {}) {
     );
   }
 
+  // Where this part hung on the car, captured BEFORE the reparent so a reset can put it
+  // back (see clearDetachedParts). Local transform, not world: the car will be somewhere
+  // else entirely by then.
+  const origin = {
+    parent: node.parent,
+    position: node.position.clone(),
+    quaternion: node.quaternion.clone(),
+    scale: node.scale.clone(),
+  };
+
   // Reparent to the scene root. `attach` preserves the world transform, so the part does
   // not jump on the frame it comes off.
   scene.attach(node);
@@ -118,6 +128,7 @@ export function detachPart(world, scene, node, { velocity, normal } = {}) {
     node,
     body,
     collider,
+    origin,
     prev: { pos: { ...spawn }, quat: { ...rot } },
   };
   detached.push(entry);
@@ -199,11 +210,26 @@ export function getDetachedNames() {
   return detached.map((d) => d.node.name);
 }
 
-/** Destroy every debris body. Must run on unmount, or StrictMode leaks them. */
-export function clearDetachedParts(world) {
+/**
+ * Destroy every debris body. Must run on unmount, or StrictMode leaks them.
+ *
+ * `reattach` additionally puts each part back on the car, which is what the R-key reset
+ * needs: without it the bodies would go but the meshes would stay lying on the ground as
+ * orphans, since detachPart reparented them to the scene root. Unmount doesn't want this —
+ * the whole cloned model is being thrown away — hence the flag rather than doing it always.
+ */
+export function clearDetachedParts(world, { reattach = false } = {}) {
   for (const d of detached) {
     d.node.userData.detached = false;
     if (world) world.removeRigidBody(d.body); // also removes its collider
+    if (reattach && d.origin?.parent) {
+      // `add`, not `attach`: attach would preserve the world transform the debris ended up
+      // with. The saved LOCAL transform is what puts the part back where it belongs.
+      d.origin.parent.add(d.node);
+      d.node.position.copy(d.origin.position);
+      d.node.quaternion.copy(d.origin.quaternion);
+      d.node.scale.copy(d.origin.scale);
+    }
   }
   detached.length = 0;
 }

@@ -1,9 +1,10 @@
 import { Suspense, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { useSelector } from 'react-redux';
 import { GroundPlane } from './GroundPlane';
 import { VehicleMesh } from './VehicleMesh';
 import { OBSTACLE_COMPONENTS } from './obstacles';
-import { SCENE_OBSTACLES } from '../obstacles/layout';
+import { selectSceneObstacles } from '../state/selectors';
 import { CameraRig } from './CameraRig';
 
 
@@ -11,6 +12,14 @@ export function SceneCanvas({ children }) {
   // Owned here so both the vehicle (which writes it) and the camera (which reads it) can
   // share the car's <group>.
   const vehicleBodyRef = useRef(null);
+  // The active layout, straight from the store — editing it in the editor tab rebuilds the
+  // bodies here (useObstacleBody keys its effect on the position/size primitives, and its
+  // cleanup removes the collider and body, so this needs no teardown of its own).
+  //
+  // This useSelector is deliberately OUTSIDE <Canvas>: r3f's reconciler is a separate root,
+  // so React context inside the canvas subtree is not something to depend on. The array is
+  // read here and consumed below as a plain value.
+  const obstacles = useSelector(selectSceneObstacles);
 
   return (
     // The initial camera is roughly the chase pose so the very first frame is sensible;
@@ -34,8 +43,8 @@ export function SceneCanvas({ children }) {
       <directionalLight position={[-10, 8, -10]} intensity={0.5} />
       <Suspense fallback={null}>
         <GroundPlane />
-        {/* Placement is data (obstacles/layout.js); this only resolves type -> component. */}
-        {SCENE_OBSTACLES.map(({ id, type, ...props }) => {
+        {/* Placement is data (the active layout); this only resolves type -> component. */}
+        {obstacles.map(({ id, type, ...props }) => {
           const Obstacle = OBSTACLE_COMPONENTS[type];
           if (!Obstacle) {
             console.warn(`SceneCanvas: unknown obstacle type "${type}" (id "${id}")`);

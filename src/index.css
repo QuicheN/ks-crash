@@ -3,12 +3,282 @@ html, body, #root {
   margin: 0;
 }
 
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #dfe6ec;
+  background: #0b0e11;
+}
+
 .app-layout {
   height: 100%;
   display: flex;
+  flex-direction: column;
+}
+
+/* The simulator and the editor stack in here; only one is visible at a time. */
+.tab-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 .viewport {
+  position: absolute;
+  inset: 0;
+}
+
+/* Hidden, NOT unmounted and NOT display:none — see App.jsx. */
+.viewport--hidden {
+  visibility: hidden;
+}
+
+/* --- tabs ---------------------------------------------------------------- */
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  background: #0b0e11;
+  border-bottom: 1px solid #1c242c;
+  flex: none;
+}
+
+.tab {
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 13px;
+  color: #8c9aa7;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #dfe6ec;
+}
+
+.tab--active {
+  color: #ffffff;
+  background: #151b21;
+  border-color: #1c242c;
+}
+
+/* --- editor -------------------------------------------------------------- */
+.editor {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0b0e11;
+  z-index: 1;
+}
+
+.editor-header {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #1c242c;
+}
+
+.name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8c9aa7;
+}
+
+.name-field input {
+  width: 280px;
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.editor-body {
   flex: 1;
-  height: 100%;
+  min-height: 0;
+  display: flex;
+}
+
+.editor-side {
+  width: 340px;
+  flex: none;
+  overflow-y: auto;
+  border-right: 1px solid #1c242c;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8c9aa7;
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6d7b88;
+}
+
+.error {
+  margin: 6px 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #ffd7d2;
+  background: #3a1d1a;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.meta {
+  display: block;
+  font-size: 11px;
+  color: #6d7b88;
+}
+
+/* --- shared controls ------------------------------------------------------ */
+button,
+input {
+  font: inherit;
+  color: #dfe6ec;
+  background: #1b232b;
+  border: 1px solid #2a343e;
+  border-radius: 4px;
+  padding: 5px 10px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #253039;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.ghost {
+  background: transparent;
+}
+
+.button-row,
+.type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  font-size: 12px;
+  border-left: 4px solid var(--chip-color, #2a343e);
+}
+
+.chip--armed {
+  background: #2f3d49;
+  border-color: #6ea8ff;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.field-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: #8c9aa7;
+}
+
+.field-grid input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.obstacle-list,
+.saved-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  gap: 4px;
+}
+
+.row-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.row--selected .row-main {
+  border-color: #6ea8ff;
+}
+
+.row-delete {
+  padding: 5px 8px;
+  color: #a2adb8;
+}
+
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+/* --- top-down map --------------------------------------------------------- */
+.map-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.map-canvas {
+  display: block;
+  touch-action: none; /* pointer events drive pan/drag; don't let the browser scroll instead */
+}
+
+.map-canvas:active {
+  cursor: grabbing;
+}
+
+.map-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: #7b8794;
+  background: rgba(11, 14, 17, 0.75);
+  padding: 4px 8px;
+  border-radius: 4px;
 }

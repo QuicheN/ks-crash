@@ -33,8 +33,9 @@ function snapshot(vehicle) {
   prev.quat.w = r.w;
 }
 
-export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRef) {
+export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRef, onResetRef) {
   const accumulator = useRef(0);
+  const resetHeld = useRef(false);
 
   useFrame((_, delta) => {
     const world = getWorld();
@@ -44,6 +45,21 @@ export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRe
 
     // Seed prev before the very first step so frame one never blends from garbage.
     if (!vehicle.prev) snapshot(vehicle);
+
+    // Respawn (R), edge-triggered so holding the key resets once rather than every frame.
+    // It belongs here, not in a component: this is between physics steps, and `prev` has to
+    // be re-seeded from the new transform — otherwise useVehicleSync spends the next frame
+    // interpolating the car from wherever it crashed back to the spawn point, dragging it
+    // visibly across the map. The leftover accumulator goes too, so no banked time is spent
+    // simulating the frame the reset happened in.
+    const wantsReset = controlsRef.current.reset;
+    if (wantsReset && !resetHeld.current) {
+      onResetRef?.current?.();
+      snapshot(vehicle);
+      vehicle.alpha = 0;
+      accumulator.current = 0;
+    }
+    resetHeld.current = wantsReset;
 
     // Bank this frame's elapsed time, then drain it in fixed-size chunks. The cap
     // discards excess time (e.g. after the tab was backgrounded) instead of trying

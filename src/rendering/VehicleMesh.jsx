@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { getWorld } from '../physics/world';
-import { createVehicle } from '../physics/vehicleController';
+import { createVehicle, resetVehicle } from '../physics/vehicleController';
 import { applySpeedBoost } from '../physics/triggers';
 import { useKeyboardControls } from '../input/useKeyboardControls';
 import { usePhysicsLoop } from '../hooks/usePhysicsLoop';
@@ -87,6 +87,7 @@ export function VehicleMesh({ bodyRef: externalBodyRef, vehicleId = ACTIVE_VEHIC
   // render is not allowed).
   const onImpactRef = useRef(null);
   const onTriggerRef = useRef(null);
+  const onResetRef = useRef(null);
 
   // Create the physics vehicle exactly once per definition. The cleanup tears it down so
   // React StrictMode's dev double-mount doesn't leave a duplicate chassis in the world.
@@ -120,6 +121,18 @@ export function VehicleMesh({ bodyRef: externalBodyRef, vehicleId = ACTIVE_VEHIC
       if (trigger.type === 'boost') applySpeedBoost(chassisBody, trigger.speed);
     };
 
+    // The R key. Same teardown as unmount, minus the parts that only make sense when the
+    // model is being thrown away: debris is REATTACHED rather than just deleted, so the car
+    // comes back whole rather than missing every panel it lost.
+    onResetRef.current = () => {
+      const v = vehicleRef.current;
+      if (!v) return;
+      resetVehicle(v, START_POSITION);
+      clearDetachedParts(world, { reattach: true });
+      // After the reattach, so the true rest transforms win over the saved detach-time ones.
+      resetCrumple(prepared.destructible);
+    };
+
     return () => {
       const v = vehicleRef.current;
       if (v) {
@@ -137,7 +150,7 @@ export function VehicleMesh({ bodyRef: externalBodyRef, vehicleId = ACTIVE_VEHIC
 
   // Both loops internally no-op until the vehicle exists, so it's safe that the
   // effect above populates vehicleRef only after this first render commits.
-  usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRef);
+  usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRef, onResetRef);
   useVehicleSync(vehicleRef, bodyRef, wheelsRef);
 
   return (
