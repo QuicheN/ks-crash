@@ -47,7 +47,7 @@ const MANIFEST = {
   [PartCategory.FENDER]: { stiffness: 0.45, detachSeverity: 12 },
   [PartCategory.HOOD]: { stiffness: 0.5, detachSeverity: 14 },
   [PartCategory.TRUNK]: { stiffness: 0.5, detachSeverity: 14 },
-  [PartCategory.DOOR]: { stiffness: 0.6, detachSeverity: 18 },
+  [PartCategory.DOOR]: { stiffness: 0.6, detachSeverity: 13 },
   [PartCategory.GLASS]: { stiffness: 0.9, detachSeverity: 10 }, // rigid, then shatters
   [PartCategory.QUARTER_PANEL]: { stiffness: 0.7, detachSeverity: 25 },
   [PartCategory.ROOF]: { stiffness: 0.75, detachSeverity: 30 },
