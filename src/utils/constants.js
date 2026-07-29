@@ -65,10 +65,18 @@ export const CAMERA_RECENTER_LAMBDA = 2.5; // how fast it swings back
 export const GROUP_VEHICLE = 0x0001;
 export const GROUP_DEBRIS = 0x0002;
 export const GROUP_WORLD = 0x0004;
+// Trigger volumes (the acceleration pad) are sensors: they report an overlap and apply no
+// force. Their own group matters — a trigger must NOT be in GROUP_WORLD, because the
+// suspension raycasts below filter to exactly that, and a wheel would then ride up the
+// invisible sensor box as if it were solid ground.
+export const GROUP_TRIGGER = 0x0008;
 const NOT_DEBRIS = 0xffff & ~GROUP_DEBRIS;
-export const CHASSIS_GROUPS = (GROUP_VEHICLE << 16) | NOT_DEBRIS;
+export const CHASSIS_GROUPS = (GROUP_VEHICLE << 16) | NOT_DEBRIS; // filter admits GROUP_TRIGGER
 export const DEBRIS_GROUPS = (GROUP_DEBRIS << 16) | NOT_DEBRIS; // also ignores other debris
 export const OBSTACLE_GROUPS = (GROUP_WORLD << 16) | 0xffff;
+// Triggers see the vehicle and nothing else — not the ground, and not the debris a crash
+// leaves lying on top of them.
+export const TRIGGER_GROUPS = (GROUP_TRIGGER << 16) | GROUP_VEHICLE;
 // Suspension raycasts only see world geometry — otherwise a bumper lying on the road would
 // lift the wheel that rolls over it.
 export const WHEEL_RAY_GROUPS = (GROUP_VEHICLE << 16) | GROUP_WORLD;
@@ -87,6 +95,12 @@ export const DETACHED_PART_DENSITY = 120.0;
 // A detached part inherits the chassis velocity plus this much kick along the contact
 // normal, so it visibly separates instead of riding along with the car.
 export const DETACH_SEPARATION_SPEED = 2.5; // m/s
+
+// --- Acceleration pad -----------------------------------------------------
+// Speed the pad sets the car to, in m/s (89.4 = 200mph). PLACEHOLDER: this becomes a
+// per-pad, user-defined value once the scenario builder exists. Applied along the car's own
+// heading, so crossing a pad backwards launches the car backwards.
+export const BOOST_PAD_SPEED = 89.4;
 
 // --- Crumple (whole-chunk deformation) -----------------------------------
 // Chunks within this distance of the contact point (plus their own radius) get crushed.

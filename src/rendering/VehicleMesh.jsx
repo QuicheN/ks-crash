@@ -13,6 +13,7 @@ import { useGLTF } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { getWorld } from '../physics/world';
 import { createVehicle } from '../physics/vehicleController';
+import { applySpeedBoost } from '../physics/triggers';
 import { useKeyboardControls } from '../input/useKeyboardControls';
 import { usePhysicsLoop } from '../hooks/usePhysicsLoop';
 import { useVehicleSync } from '../hooks/useVehicleSync';
@@ -81,9 +82,11 @@ export function VehicleMesh({ bodyRef: externalBodyRef, vehicleId = ACTIVE_VEHIC
   // React ref during render isn't allowed. useVehicleSync only needs `.current`.
   const wheelsRef = useMemo(() => ({ current: prepared.wheels }), [prepared]);
 
-  // Impact handler, held in a ref so the physics loop calls it without re-subscribing its
-  // useFrame. Populated in the mount effect below (assigning during render is not allowed).
+  // Impact and trigger handlers, held in refs so the physics loop calls them without
+  // re-subscribing its useFrame. Populated in the mount effect below (assigning during
+  // render is not allowed).
   const onImpactRef = useRef(null);
+  const onTriggerRef = useRef(null);
 
   // Create the physics vehicle exactly once per definition. The cleanup tears it down so
   // React StrictMode's dev double-mount doesn't leave a duplicate chassis in the world.
@@ -109,6 +112,14 @@ export function VehicleMesh({ bodyRef: externalBodyRef, vehicleId = ACTIVE_VEHIC
       applyCrumple(prepared.destructible, impact, chassisBody);
     };
 
+    // Trigger volumes the car drove into. Also the physics ref path — the boost writes
+    // straight to the chassis body's velocity.
+    onTriggerRef.current = (trigger) => {
+      const chassisBody = vehicleRef.current?.chassisBody;
+      if (!chassisBody) return;
+      if (trigger.type === 'boost') applySpeedBoost(chassisBody, trigger.speed);
+    };
+
     return () => {
       const v = vehicleRef.current;
       if (v) {
@@ -126,7 +137,7 @@ export function VehicleMesh({ bodyRef: externalBodyRef, vehicleId = ACTIVE_VEHIC
 
   // Both loops internally no-op until the vehicle exists, so it's safe that the
   // effect above populates vehicleRef only after this first render commits.
-  usePhysicsLoop(vehicleRef, controlsRef, onImpactRef);
+  usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRef);
   useVehicleSync(vehicleRef, bodyRef, wheelsRef);
 
   return (

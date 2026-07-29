@@ -12,6 +12,7 @@
 // architecture contract in edits.md — Redux is for human-readable state, dispatched off the
 // per-frame path).
 import { IMPACT_MIN_SEVERITY } from '../utils/constants';
+import { getTrigger } from './triggers';
 
 // The chassis velocity as it was *entering* the step that produced these events. Collision
 // events are drained after world.step(), by which point the solver has already cancelled
@@ -35,14 +36,27 @@ export function captureApproachVelocity(vehicle) {
  *   point     - world-space contact point (plain object; Rapier's is a temp view)
  *   normal    - world-space unit contact normal (plain object)
  * Fires only on contact START; ongoing rest contact with the ground is not an impact.
+ *
+ * `onTrigger` receives the descriptor a sensor was registered with (physics/triggers.js).
+ * Trigger overlaps arrive on this same queue but are NOT impacts and must be matched before
+ * the severity path — a sensor produces no contact manifolds, so it would score -1 and be
+ * discarded by the IMPACT_MIN_SEVERITY gate below.
  */
-export function drainCollisions(world, eventQueue, vehicle, onImpact) {
-  if (!eventQueue || !vehicle || !onImpact) return;
+export function drainCollisions(world, eventQueue, vehicle, onImpact, onTrigger) {
+  if (!eventQueue || !vehicle || (!onImpact && !onTrigger)) return;
   const chassisHandle = vehicle.chassisCollider.handle;
 
   eventQueue.drainCollisionEvents((h1, h2, started) => {
     if (!started) return;
     if (h1 !== chassisHandle && h2 !== chassisHandle) return;
+
+    const otherHandle = h1 === chassisHandle ? h2 : h1;
+    const trigger = getTrigger(otherHandle);
+    if (trigger) {
+      onTrigger?.(trigger);
+      return; // a sensor is an overlap, never a contact — nothing below applies
+    }
+    if (!onImpact) return;
 
     const c1 = world.getCollider(h1);
     const c2 = world.getCollider(h2);
@@ -80,7 +94,7 @@ export function drainCollisions(world, eventQueue, vehicle, onImpact) {
       severity,
       point: { x: px, y: py, z: pz },
       normal: { x: nx, y: ny, z: nz },
-      otherHandle: h1 === chassisHandle ? h2 : h1,
+      otherHandle,
     });
   });
 }

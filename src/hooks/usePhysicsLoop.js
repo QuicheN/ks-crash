@@ -33,7 +33,7 @@ function snapshot(vehicle) {
   prev.quat.w = r.w;
 }
 
-export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef) {
+export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef, onTriggerRef) {
   const accumulator = useRef(0);
 
   useFrame((_, delta) => {
@@ -62,8 +62,15 @@ export function usePhysicsLoop(vehicleRef, controlsRef, onImpactRef) {
       captureApproachVelocity(vehicle);
       world.step(eventQueue); // integrate the whole world, collecting contact events
       // Drained per substep, not per frame, so a multi-substep frame can't merge or drop
-      // two separate impacts.
-      drainCollisions(world, eventQueue, vehicle, onImpactRef?.current);
+      // two separate impacts. The same drain reports trigger-volume overlaps (the
+      // acceleration pad), which arrive on this queue but are not impacts.
+      drainCollisions(
+        world,
+        eventQueue,
+        vehicle,
+        onImpactRef?.current,
+        onTriggerRef?.current,
+      );
       accumulator.current -= FIXED_DT;
       steps++;
     }
