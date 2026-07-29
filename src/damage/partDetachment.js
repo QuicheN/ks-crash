@@ -16,8 +16,10 @@ import { getDetachSeverity } from './stiffnessMap';
 import {
   DEBRIS_GROUPS,
   DETACHED_PART_DENSITY,
+  DETACH_SEPARATION_MAX,
   DETACH_SEPARATION_SPEED,
   IMPACT_PART_RADIUS_MARGIN,
+  IMPACT_SPREAD_PER_SEVERITY,
 } from '../utils/constants';
 
 // Live debris. Module-level because detachment is triggered from the physics callback and
@@ -35,6 +37,11 @@ const _s = new THREE.Vector3();
 // eligible part ever detached, and every later one compared against clobbered values.
 const _lp = new THREE.Vector3();
 const _iq = new THREE.Quaternion();
+// Also held across that loop, for the per-part scatter direction — same reason they can't be
+// shared with the vectors above.
+const _dir = new THREE.Vector3();
+const _cq = new THREE.Quaternion();
+const _kick = { x: 0, y: 0, z: 0 };
 
 /**
  * Collect a part's triangle vertices expressed in the part node's own local frame.
@@ -68,7 +75,7 @@ export function worldBoundingRadius(node) {
  * Detach `node` into its own rigid body.
  * Returns the debris record, or null if it couldn't be detached (degenerate hull).
  */
-export function detachPart(world, scene, node, { velocity, normal } = {}) {
+export function detachPart(world, scene, node, { velocity, normal, separation } = {}) {
   if (!world || !node || node.userData.detached) return null;
 
   const verts = collectLocalVertices(node);
@@ -95,15 +102,19 @@ export function detachPart(world, scene, node, { velocity, normal } = {}) {
   // cuboid, so without this it would be spawned interpenetrating and violently ejected.
   collider.setCollisionGroups(DEBRIS_GROUPS);
 
-  // Inherit the car's velocity so the part travels with the crash, plus a kick along the
-  // contact normal so it visibly separates instead of riding along.
+  // Inherit the car's velocity so the part travels with the crash, plus a kick along `normal`
+  // so it visibly separates instead of riding along. Callers that detach a whole cluster at
+  // once pass a per-part direction (away from the contact point) rather than the shared
+  // contact normal — otherwise every panel leaves on the same vector and the wreck reads as
+  // one car-shaped clump still flying in formation.
   if (velocity) {
     const n = normal ?? { x: 0, y: 1, z: 0 };
+    const kick = separation ?? DETACH_SEPARATION_SPEED;
     body.setLinvel(
       {
-        x: velocity.x + n.x * DETACH_SEPARATION_SPEED,
-        y: velocity.y + n.y * DETACH_SEPARATION_SPEED,
-        z: velocity.z + n.z * DETACH_SEPARATION_SPEED,
+        x: velocity.x + n.x * kick,
+        y: velocity.y + n.y * kick,
+        z: velocity.z + n.z * kick,
       },
       true,
     );
@@ -138,9 +149,18 @@ export function detachPart(world, scene, node, { velocity, normal } = {}) {
 /**
  * Decide which registered parts come off for a given impact and detach them.
  *
- * `parts` is [{ node, category, localPos, radius }]. A part detaches when the impact lands
- * within its bounding radius (+ margin) AND the severity clears its category's threshold —
- * so a rear-end hit can't pop the front bumper off.
+ * `parts` is [{ node, category, localPos, radius }]. A part detaches when the severity clears
+ * its category's threshold AND the impact lands within reach of it — where **reach grows with
+ * how far the impact overshoots that threshold**:
+ *
+ *     reach = part.radius + IMPACT_PART_RADIUS_MARGIN + overshoot * IMPACT_SPREAD_PER_SEVERITY
+ *
+ * The overshoot term is what makes a severe crash destroy the whole car. Without it the reach
+ * is a flat ~1m on a 4.75m car at every speed, so a 200mph impact shed only the four chunks
+ * nearest the contact point and everything else stayed bolted on no matter how hard you hit.
+ * Keying it on the overshoot rather than raw severity preserves the low end exactly: a part
+ * hit at precisely its threshold still has to be at the contact point, so a rear-end tap
+ * cannot pop the front bumper off.
  *
  * The proximity test runs in CHASSIS-LOCAL space, not world space. Parts are rigidly
  * attached, so their car-local positions are constants, while their Three.js world
@@ -158,6 +178,10 @@ export function detachPartsNearImpact(world, scene, parts, impact, chassisBody) 
   _iq.set(r.x, r.y, r.z, r.w).invert();
   _lp.set(point.x - t.x, point.y - t.y, point.z - t.z).applyQuaternion(_iq);
 
+  // Chassis rotation (not inverted) — needed to turn the car-local offset of each part into
+  // the world-space direction its debris is thrown in.
+  _cq.set(r.x, r.y, r.z, r.w);
+
   const velocity = chassisBody.linvel();
   let count = 0;
   for (const part of parts) {
@@ -165,14 +189,35 @@ export function detachPartsNearImpact(world, scene, parts, impact, chassisBody) 
     const threshold = getDetachSeverity(part.category);
     if (threshold === null || severity < threshold) continue;
 
-    const dist = Math.hypot(
-      _lp.x - part.localPos.x,
-      _lp.y - part.localPos.y,
-      _lp.z - part.localPos.z,
-    );
-    if (dist > part.radius + IMPACT_PART_RADIUS_MARGIN) continue;
+    const overshoot = severity - threshold; // >= 0 by the test above
+    const dx = part.localPos.x - _lp.x;
+    const dy = part.localPos.y - _lp.y;
+    const dz = part.localPos.z - _lp.z;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist > part.radius + IMPACT_PART_RADIUS_MARGIN + overshoot * IMPACT_SPREAD_PER_SEVERITY) {
+      continue;
+    }
 
-    if (detachPart(world, scene, part.node, { velocity, normal })) count++;
+    // Throw this part outward from the contact point rather than along the shared contact
+    // normal, so a car that loses 35 pieces at once scatters instead of flying in formation.
+    // sqrt, so the kick grows quickly out of the trivial range and then flattens — a 300mph
+    // hit should not fire debris at ten times the speed a 100mph one does.
+    let kick = DETACH_SEPARATION_SPEED;
+    if (dist > 1e-4) {
+      _dir.set(dx, dy, dz).divideScalar(dist).applyQuaternion(_cq);
+      kick = Math.min(DETACH_SEPARATION_MAX, DETACH_SEPARATION_SPEED + Math.sqrt(overshoot));
+    } else {
+      // Part sits exactly on the contact point — no outward direction to derive.
+      _dir.set(normal.x, normal.y, normal.z);
+    }
+    // Mutated per part and read synchronously by detachPart, so no allocation per detach.
+    _kick.x = _dir.x;
+    _kick.y = _dir.y;
+    _kick.z = _dir.z;
+
+    if (detachPart(world, scene, part.node, { velocity, normal: _kick, separation: kick })) {
+      count++;
+    }
   }
   return count;
 }

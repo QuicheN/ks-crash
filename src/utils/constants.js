@@ -89,12 +89,24 @@ export const IMPACT_MIN_SEVERITY = 2.0; // m/s
 // A part detaches when an impact lands within (its bounding radius + this) of the contact
 // point. Keeps a rear-end hit from popping the front bumper off.
 export const IMPACT_PART_RADIUS_MARGIN = 0.35; // meters
+// How much FURTHER the damage reaches per m/s that an impact overshoots a part's own detach
+// threshold — the difference between "severity decides which categories qualify" and
+// "severity decides how far the car comes apart". Without it the reach above is the same at
+// 20mph and 600mph, which is why a 200mph hit used to shed only the four chunks nearest the
+// contact point. Calibrated for total loss at ~130 m/s (300mph): the toughest category
+// (STRUCTURE, threshold 60) then overshoots by 70, and 70 x 0.035 = 2.45m ~ the whole car from
+// a nose-on contact. Measured: 3/5/9/12/29/37 of 38 chunks at 10/20/30/45/90/130 m/s. Keyed on the OVERSHOOT, not raw severity, so a part hit at exactly its
+// threshold still has to be right at the contact point.
+export const IMPACT_SPREAD_PER_SEVERITY = 0.035; // metres of reach per m/s over threshold
 // Density for detached debris. Applied to the convex hull volume, so a ~0.1m³ bumper hull
 // lands near 12kg.
 export const DETACHED_PART_DENSITY = 120.0;
-// A detached part inherits the chassis velocity plus this much kick along the contact
-// normal, so it visibly separates instead of riding along with the car.
-export const DETACH_SEPARATION_SPEED = 2.5; // m/s
+// A detached part inherits the chassis velocity plus this much kick away from the contact
+// point, so it visibly separates instead of riding along with the car. The kick grows with
+// impact severity (see partDetachment) — at the floor value 35 parts coming off at once just
+// travel onward as one car-shaped clump.
+export const DETACH_SEPARATION_SPEED = 2.5; // m/s, the minimum kick
+export const DETACH_SEPARATION_MAX = 12.0; // m/s, the cap on the severity-scaled kick
 
 // --- Acceleration pad -----------------------------------------------------
 // Speed the pad sets the car to, in m/s (89.4 = 200mph). PLACEHOLDER: this becomes a

@@ -33,7 +33,12 @@ export const PartCategory = {
 //
 // Ordering rationale: trim and mirrors are held on by clips and go first; bumpers are
 // designed as sacrificial crush structures; hood and trunk are latched and need a real hit;
-// rockers and the unibody are the structure itself and never detach.
+// rockers and the unibody are the structure itself and go last, at severities well past
+// anything survivable.
+//
+// A threshold is only the ENTRY price: how far the damage then spreads from the contact point
+// scales with how far the impact overshoots it (IMPACT_SPREAD_PER_SEVERITY). So these numbers
+// set both which parts can come off and, in the same stroke, how readily they do.
 const MANIFEST = {
   [PartCategory.MIRROR]: { stiffness: 0.15, detachSeverity: 4 },
   [PartCategory.TRIM]: { stiffness: 0.15, detachSeverity: 5 },
@@ -46,8 +51,11 @@ const MANIFEST = {
   [PartCategory.GLASS]: { stiffness: 0.9, detachSeverity: 10 }, // rigid, then shatters
   [PartCategory.QUARTER_PANEL]: { stiffness: 0.7, detachSeverity: 25 },
   [PartCategory.ROOF]: { stiffness: 0.75, detachSeverity: 30 },
-  [PartCategory.ROCKER]: { stiffness: 0.9, detachSeverity: null },
-  [PartCategory.STRUCTURE]: { stiffness: 1.0, detachSeverity: null },
+  // The load-bearing core. These used to be `null` (indestructible at any speed), which put a
+  // floor under how completely the car could come apart — a 600mph hit still left a full
+  // skeleton. They now fail, but only at severities no survivable crash reaches.
+  [PartCategory.ROCKER]: { stiffness: 0.9, detachSeverity: 45 },
+  [PartCategory.STRUCTURE]: { stiffness: 1.0, detachSeverity: 60 },
   // Wheels never detach and never crumple — the raycast vehicle controller drives from them,
   // so deforming or removing one would break the car's ability to move at all.
   [PartCategory.WHEEL]: { stiffness: 1.0, detachSeverity: null },
